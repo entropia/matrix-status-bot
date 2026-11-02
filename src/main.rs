@@ -3,7 +3,7 @@ use serde::Deserialize;
 use serde_json::json;
 use std::env;
 use std::time::Duration;
-use tracing::{debug,info};
+use tracing::{debug, info};
 
 const APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
 const CLIENT_API: &str = "_matrix/client/v3";
