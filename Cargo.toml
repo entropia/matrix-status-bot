@@ -1,0 +1,14 @@
+[package]
+name = "matrix-status-bot"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+reqwest = { version = "0.13.5", features = ["json"] }
+tokio = { version="1.54.1", features=["full"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+
+[profile.release-lto]
+inherits = "release"
+lto = true
