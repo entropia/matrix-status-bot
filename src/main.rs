@@ -1,9 +1,9 @@
 use reqwest::{Client, header};
 use serde::Deserialize;
 use serde_json::json;
-use std::cmp::PartialEq;
 use std::env;
-use std::fmt::Debug;
+use std::time::Duration;
+use tracing::{debug,info};
 
 const APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
 const CLIENT_API: &str = "_matrix/client/v3";
@@ -38,13 +38,15 @@ struct MatrixResponse {
 }
 
 async fn get_api_status(config: &Config) -> Status {
+    info!("Getting SpaceAPI status");
+
     let response = reqwest::get(config.spaceapi_endpoint.clone())
         .await
         .unwrap()
         .json::<ApiResponse>()
         .await
         .unwrap();
-    if let true = response.state.open {
+    if response.state.open {
         Status::Open
     } else {
         Status::Closed
@@ -52,15 +54,17 @@ async fn get_api_status(config: &Config) -> Status {
 }
 
 async fn get_channel_topic(config: &Config, http_client: &Client) -> String {
-    let res = http_client.get(
-        config.matrix_homeserver_address.clone()
-            + "/"
-            + CLIENT_API
-            + "/rooms/"
-            + config.matrix_channel_id.as_str()
-            + "/state"
-            + "/m.room.topic",
-    );
+    info!("Getting current Channel Topic");
+
+    let res = http_client.get(format!(
+        "{}/{}/rooms/{}/state/m.room.topic",
+        config
+            .matrix_homeserver_address
+            .clone()
+            .trim_end_matches("/"),
+        CLIENT_API,
+        config.matrix_channel_id.as_str()
+    ));
     res.send()
         .await
         .unwrap()
@@ -71,23 +75,28 @@ async fn get_channel_topic(config: &Config, http_client: &Client) -> String {
 }
 
 async fn set_channel_topic(topic: String, http_client: &Client, config: &Config) {
-    http_client
-        .put(
-            config.matrix_homeserver_address.clone()
-                + "/"
-                + CLIENT_API
-                + "/rooms/"
-                + config.matrix_channel_id.as_str()
-                + "/state"
-                + "/m.room.topic",
-        )
+    debug!("Setting Channel Topic");
+
+    let res = http_client
+        .put(format!(
+            "{}/{}/rooms/{}/state/m.room.topic",
+            config
+                .matrix_homeserver_address
+                .clone()
+                .trim_end_matches("/"),
+            CLIENT_API,
+            config.matrix_channel_id.as_str()
+        ))
         .json(&json!({"topic": &topic}))
         .send()
         .await
         .unwrap();
+    res.error_for_status().unwrap();
 }
 
-async fn read_config() -> Config {
+fn read_config() -> Config {
+    info!("Reading config");
+
     Config {
         matrix_auth_token: env::var("MATRIX_AUTH_TOKEN").unwrap(),
         matrix_homeserver_address: env::var("MATRIX_HOMESERVER_ADDRESS").unwrap(),
@@ -98,7 +107,7 @@ async fn read_config() -> Config {
     }
 }
 
-async fn get_expected_topic(status: Status, config: &Config) -> String {
+fn get_expected_topic(status: Status, config: &Config) -> String {
     if let Status::Open = status {
         config.matrix_topic_open.clone()
     } else {
@@ -106,7 +115,9 @@ async fn get_expected_topic(status: Status, config: &Config) -> String {
     }
 }
 
-async fn create_matrix_client(config: &Config) -> Client {
+fn create_matrix_client(config: &Config) -> Client {
+    debug!("Creating shared matrix client");
+
     let mut http_headers = header::HeaderMap::new();
     http_headers.insert(
         header::AUTHORIZATION,
@@ -116,6 +127,7 @@ async fn create_matrix_client(config: &Config) -> Client {
     let http_client = Client::builder()
         .user_agent(APP_USER_AGENT)
         .default_headers(http_headers)
+        .timeout(Duration::from_secs(5))
         .build()
         .unwrap();
 
@@ -124,22 +136,24 @@ async fn create_matrix_client(config: &Config) -> Client {
 
 #[tokio::main]
 async fn main() {
-    let config = read_config().await;
+    tracing_subscriber::fmt().init();
 
-    let matrix_client = create_matrix_client(&config).await;
+    let config = read_config();
+
+    let matrix_client = create_matrix_client(&config);
 
     // Get Status, Topic
     let api_status = get_api_status(&config).await;
     let channel_topic = get_channel_topic(&config, &matrix_client).await;
 
     // Get topic for status
-    let expected_topic = get_expected_topic(api_status, &config).await;
+    let expected_topic = get_expected_topic(api_status, &config);
 
     // Compare Status, Topic and change topic if needed
     if expected_topic == channel_topic {
-        print!("Topic is correct")
+        info!("Topic is correct and was not changed")
     } else {
         set_channel_topic(expected_topic, &matrix_client, &config).await;
-        print!("Topic was not correct and was changed")
+        info!("Topic was not correct and was changed")
     }
 }
