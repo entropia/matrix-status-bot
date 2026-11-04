@@ -1,4 +1,4 @@
-use reqwest::{Client, header};
+use reqwest::Client;
 use serde::Deserialize;
 use serde_json::json;
 use std::env;
@@ -39,18 +39,21 @@ struct MatrixResponse {
     topic: String,
 }
 
-async fn get_api_status(config: &Config) -> Status {
+async fn get_api_status(config: &Config, http_client: &Client) -> Status {
     #![allow(clippy::needless_return)]
 
     info!("Getting SpaceAPI status");
 
-    let response = reqwest::get(config.spaceapi_endpoint.clone())
+    let res = http_client
+        .get(&config.spaceapi_endpoint)
+        .send()
         .await
         .unwrap()
         .json::<ApiResponse>()
         .await
         .unwrap();
-    return if response.state.open {
+
+    return if res.state.open {
         Status::Open
     } else {
         Status::Closed
@@ -62,23 +65,25 @@ async fn get_channel_topic(config: &Config, http_client: &Client) -> String {
 
     info!("Getting current Channel Topic");
 
-    let res = http_client.get(format!(
-        "{}/{}/rooms/{}/state/m.room.topic",
-        config
-            .matrix_homeserver_address
-            .clone()
-            .trim_end_matches("/"),
-        CLIENT_API,
-        config.matrix_channel_id.as_str()
-    ));
-    return res
+    let res = http_client
+        .get(format!(
+            "{}/{}/rooms/{}/state/m.room.topic",
+            config
+                .matrix_homeserver_address
+                .clone()
+                .trim_end_matches("/"),
+            CLIENT_API,
+            config.matrix_channel_id.as_str()
+        ))
+        .bearer_auth(&config.matrix_auth_token)
         .send()
         .await
         .unwrap()
         .json::<MatrixResponse>()
         .await
-        .unwrap()
-        .topic;
+        .unwrap();
+
+    return res.topic;
 }
 
 async fn set_channel_topic(topic: String, http_client: &Client, config: &Config) {
@@ -95,6 +100,7 @@ async fn set_channel_topic(topic: String, http_client: &Client, config: &Config)
             config.matrix_channel_id.as_str()
         ))
         .json(&json!({"topic": &topic}))
+        .bearer_auth(&config.matrix_auth_token)
         .send()
         .await
         .unwrap();
@@ -126,20 +132,13 @@ fn get_expected_topic(status: Status, config: &Config) -> String {
     };
 }
 
-fn create_matrix_client(config: &Config) -> Client {
+fn create_http_client() -> Client {
     #![allow(clippy::needless_return)]
 
     debug!("Creating shared matrix client");
 
-    let mut http_headers = header::HeaderMap::new();
-    http_headers.insert(
-        header::AUTHORIZATION,
-        header::HeaderValue::from_str(&format!("Bearer {}", config.matrix_auth_token)).unwrap(),
-    );
-
     let http_client = Client::builder()
         .user_agent(APP_USER_AGENT)
-        .default_headers(http_headers)
         .timeout(Duration::from_secs(5))
         .build()
         .unwrap();
@@ -153,11 +152,11 @@ async fn main() {
 
     let config = read_config();
 
-    let matrix_client = create_matrix_client(&config);
+    let http_client = create_http_client();
 
     // Get Status, Topic
-    let api_status = get_api_status(&config).await;
-    let channel_topic = get_channel_topic(&config, &matrix_client).await;
+    let api_status = get_api_status(&config, &http_client).await;
+    let channel_topic = get_channel_topic(&config, &http_client).await;
 
     // Get topic for status
     let expected_topic = get_expected_topic(api_status, &config);
@@ -166,7 +165,7 @@ async fn main() {
     if expected_topic == channel_topic {
         info!("Topic is correct and was not changed")
     } else {
-        set_channel_topic(expected_topic, &matrix_client, &config).await;
+        set_channel_topic(expected_topic, &http_client, &config).await;
         info!("Topic was not correct and was changed")
     }
 }
