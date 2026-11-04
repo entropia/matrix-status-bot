@@ -24,7 +24,6 @@ RUN --mount=type=bind,source=src,target=src \
 
 ################################################################################
 # Create a new stage for running the application that contains the minimal
-# We use dhi.io/static for the final stage because itâs a minimal Docker Hardened Image runtime (basically âjust # enough OS to run the binaryâ), which helps keep the image small and with a lower attack surface compared to a # # full Alpine/Debian runtime.
 ################################################################################
 
 FROM docker.io/library/alpine:3.18 AS final
