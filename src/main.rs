@@ -65,6 +65,7 @@ async fn get_api_status(config: &Config, http_client: &Client) -> anyhow::Result
 
 async fn get_channel_topic(config: &Config, http_client: &Client) -> anyhow::Result<String> {
     #![allow(clippy::needless_return)]
+    // TODO: Add handling for empty room topics
 
     info!("Getting current Channel Topic");
 

@@ -1,7 +1,8 @@
 Matrix Status Bot
 ===
 
-Simple Bot changing the room topic based on [SpaceAPI](https://spaceapi.io).
+Simple Bot changing the room topic based on [SpaceAPI](https://spaceapi.io). It is supposed to be executed as one-shot
+via a cron job or similar.
 
 Configuration
 ---
