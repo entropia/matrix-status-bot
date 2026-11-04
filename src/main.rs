@@ -4,7 +4,7 @@ use serde::Deserialize;
 use serde_json::json;
 use std::env;
 use std::time::Duration;
-use tracing::{debug, info};
+use tracing::{debug, info, instrument};
 
 // TODO: Konfigurierbares Debug-Level
 
@@ -16,6 +16,7 @@ enum Status {
     Closed,
 }
 
+#[derive(Debug)]
 struct Config {
     matrix_auth_token: String,
     matrix_homeserver_address: String,
@@ -40,6 +41,7 @@ struct MatrixResponse {
     topic: String,
 }
 
+#[instrument(err)]
 async fn get_api_status(config: &Config, http_client: &Client) -> anyhow::Result<Status> {
     #![allow(clippy::needless_return)]
 
@@ -63,6 +65,7 @@ async fn get_api_status(config: &Config, http_client: &Client) -> anyhow::Result
     };
 }
 
+#[instrument(err)]
 async fn get_channel_topic(config: &Config, http_client: &Client) -> anyhow::Result<String> {
     #![allow(clippy::needless_return)]
     // TODO: Add handling for empty room topics
@@ -92,6 +95,7 @@ async fn get_channel_topic(config: &Config, http_client: &Client) -> anyhow::Res
     return Ok(res.topic);
 }
 
+#[instrument(err)]
 async fn set_channel_topic(
     topic: String,
     http_client: &Client,
@@ -119,6 +123,7 @@ async fn set_channel_topic(
     Ok(())
 }
 
+#[instrument(err)]
 fn read_config() -> anyhow::Result<Config> {
     #![allow(clippy::needless_return)]
 
@@ -150,6 +155,7 @@ fn get_expected_topic(status: Status, config: &Config) -> String {
     };
 }
 
+#[instrument(err)]
 fn create_http_client() -> anyhow::Result<Client> {
     #![allow(clippy::needless_return)]
 
