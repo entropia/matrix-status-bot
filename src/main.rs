@@ -45,8 +45,6 @@ struct MatrixResponse {
 fn read_config() -> anyhow::Result<Config> {
     #![allow(clippy::needless_return)]
 
-    info!("Reading config");
-
     return Ok(Config {
         matrix_auth_token: read_env_var("MATRIX_AUTH_TOKEN")?,
         matrix_homeserver_address: read_env_var("MATRIX_HOMESERVER_ADDRESS")?,
@@ -67,8 +65,6 @@ fn read_env_var(name: &str) -> anyhow::Result<String> {
 fn create_http_client() -> anyhow::Result<Client> {
     #![allow(clippy::needless_return)]
 
-    debug!("Creating shared matrix client");
-
     let http_client = Client::builder()
         .user_agent(APP_USER_AGENT)
         .timeout(Duration::from_secs(5))
@@ -81,8 +77,6 @@ fn create_http_client() -> anyhow::Result<Client> {
 #[instrument(err)]
 async fn get_api_status(config: &Config, http_client: &Client) -> anyhow::Result<Status> {
     #![allow(clippy::needless_return)]
-
-    info!("Getting SpaceAPI status");
 
     let res = http_client
         .get(&config.spaceapi_endpoint)
@@ -106,8 +100,6 @@ async fn get_api_status(config: &Config, http_client: &Client) -> anyhow::Result
 async fn get_channel_topic(config: &Config, http_client: &Client) -> anyhow::Result<String> {
     #![allow(clippy::needless_return)]
     // TODO: Add handling for empty room topics
-
-    info!("Getting current Channel Topic");
 
     let res = http_client
         .get(format!(
@@ -145,8 +137,6 @@ async fn set_channel_topic(
     http_client: &Client,
     config: &Config,
 ) -> anyhow::Result<()> {
-    debug!("Setting Channel Topic");
-
     http_client
         .put(format!(
             "{}/{}/rooms/{}/state/m.room.topic",
@@ -171,12 +161,16 @@ async fn set_channel_topic(
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt().init();
 
+    info!("Reading Config");
     let config = read_config()?;
 
+    debug!("Create shared HTTP Client");
     let http_client = create_http_client()?;
 
-    // Get Status, Topic
+    info!("Get SpaceAPI Status");
     let api_status = get_api_status(&config, &http_client).await?;
+
+    info!("Get current channel topic");
     let channel_topic = get_channel_topic(&config, &http_client).await?;
 
     // Get topic for status
@@ -186,8 +180,8 @@ async fn main() -> anyhow::Result<()> {
     if expected_topic == channel_topic {
         info!("Topic is correct and was not changed")
     } else {
+        info!("Set channel topic");
         set_channel_topic(expected_topic, &http_client, &config).await?;
-        info!("Topic was not correct and was changed")
     }
     Ok(())
 }
