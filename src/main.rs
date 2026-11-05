@@ -4,6 +4,7 @@ use serde::Deserialize;
 use serde_json::json;
 use std::env;
 use std::time::Duration;
+use tokio::try_join;
 use tracing::{debug, info, instrument};
 
 // TODO: Konfigurierbares Debug-Level
@@ -168,10 +169,11 @@ async fn main() -> anyhow::Result<()> {
     let http_client = create_http_client()?;
 
     info!("Get SpaceAPI Status");
-    let api_status = get_api_status(&config, &http_client).await?;
-
     info!("Get current channel topic");
-    let channel_topic = get_channel_topic(&config, &http_client).await?;
+    let (api_status, channel_topic) = try_join!(
+        get_api_status(&config, &http_client),
+        get_channel_topic(&config, &http_client),
+    )?;
 
     // Get topic for status
     let expected_topic = get_expected_topic(api_status, &config);
