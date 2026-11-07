@@ -26,7 +26,7 @@ RUN --mount=type=bind,source=src,target=src \
 # Create a new stage for running the application that contains the minimal
 ################################################################################
 
-FROM docker.io/library/alpine:3.18 AS final
+FROM docker.io/library/alpine:3.24.4 AS final
 
 ARG UID=10001
 RUN adduser \
