@@ -1,0 +1,11 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "separateMajorMinor": true,
+  "separateMultipleMajor": true,
+  "separateMultipleMinor": false,
+  "prConcurrentLimit": 30
+}
